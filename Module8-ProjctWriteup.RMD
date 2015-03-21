@@ -1,0 +1,79 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "KE XIAOBING"
+date: "Saturday, March 21, 2015"
+output: html_document
+---
+
+## Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. The goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and find the pattens of the activities.
+
+##Load the data
+```{r, echo=TRUE}
+training <- read.csv("pml-training.csv", header=TRUE)
+testing <- read.csv("pml-testing.csv", header=TRUE)
+
+#Explore the data
+dim(training)
+dim(testing)
+```
+
+##Load support package
+```{r, echo=TRUE}
+library(caret)
+library(randomForest)
+```
+
+##Clean the data
+```{r, echo=TRUE}
+##remove near zero variables,IDs, irrelevant data
+nza_cols_train <- nearZeroVar(training)
+if (length(nza_cols_train)>0) training <- training[,-nza_cols_train]
+
+##remove the column(s) with all NA values
+allmisscols_train <- apply(training,2, function(x){sum(is.na(x))})
+training_clean <- training[, which(allmisscols_train == 0)]
+dim(training_clean)
+
+##remove below columns with non-numeric value and useless
+##column: X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp and num_window
+training_clean <- training_clean[, -c(1,2,3,4,5,6)]
+```
+
+##Create training dataset and cross validation dataset
+```{r, echo=TRUE}
+set.seed(23)
+inTrain <- createDataPartition(y=training_clean$classe, p=0.7, list=FALSE)
+trainData <- training_clean[inTrain,]
+cvData <- training_clean[-inTrain,]
+dim(trainData)
+```
+
+##Fit a model with training data, make perdiction and summarize the result
+```{r, echo=TRUE}
+modFit_rf <- randomForest(classe ~ ., data=trainData)
+modFit_rf
+plot(modFit_rf, main="Plot model of randomforest")
+
+# make predictions
+predictions <- predict(modFit_rf, cvData)
+
+# summarize results, and verify the accuracy
+confusionMatrix(predictions, cvData$classe)
+```
+Above result shows that the accuracy is greater than 0.99, and the 95%CI is also high and greater than 99%, the model is fit enough.
+
+##Use the fit model to predict the 20 test cases
+```{r, echo=TRUE}
+#prepare for testing data set
+nza_cols_test <- nearZeroVar(testing)
+if (length(nza_cols_test)>0) testing <- testing[,-nza_cols_test]
+allmisscols_test <- apply(testing,2, function(x){sum(is.na(x))})
+testing_clean <- testing[, which(allmisscols_test ==0)]
+#names(testing_clean)
+testing_clean <- testing_clean[, -c(1,2,3,4,5,6)]
+
+#use prediction model to predict 20 different test cases
+pred_result <- predict(modFit_rf, newdata=testing_clean)
+```
+
